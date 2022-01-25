@@ -26,7 +26,6 @@ namespace NFC_Keyfob_Tester
         Yes, this comment is 100% useful and informative.
         =================================================================================
          */
-        private static System.Timers.Timer rTimer;
         public byte[] SendBuff = new byte[263];
         public byte[] SendMessage = new byte[263];
         public byte[] RecvBuff = new byte[263];
@@ -35,9 +34,11 @@ namespace NFC_Keyfob_Tester
         public ModWinsCard.SCARD_READERSTATE RdrState;
         public ModWinsCard.SCARD_IO_REQUEST pioSendRequest;
         public int pcchReaders = 0;
-        public bool connectionSuccess = false, RdrFound = false, ReadIsLocked = true, WriteIsLocked = true;
-        public string error = "", Cmd = "", msg = "", type = "";
+        public bool connectionSuccess = false, RdrFound = false, readLock = true, writeLock = true, timerCheck;
+        public string error = "", Cmd = "", msg = "", type = "", oldId = "";
         public List<string> Readers = new List<string>();
+        public AutoResetEvent ResetApp = new AutoResetEvent(false);
+        public System.Timers.Timer rTimer = new System.Timers.Timer();
         public MainWindow()
         {
             InitializeComponent();
@@ -46,20 +47,17 @@ namespace NFC_Keyfob_Tester
         public void StartApp() // This is the thing that shows everything in the app. It can be called again to "refresh" the app.
         {
             // before anything else context has to be established
-            string context = "";
             retCode = ModWinsCard.SCardEstablishContext(ModWinsCard.SCARD_SCOPE_USER, 0, 0, ref hContext);
             if (retCode != ModWinsCard.SCARD_S_SUCCESS)
             {
                 error = ModWinsCard.GetScardErrMsg(retCode);
-                context = "Context: not established" + error;
+                MessageBox.Show(error);
             }
             else
             {
-                context = "Context: established";
             }
-            this.Dispatcher.Invoke(() => { LblContext.Text = ""; });
-            this.Dispatcher.Invoke(() => { LblContext.Inlines.Add(context); });
-            string ReaderFound = "Reader: Found";
+
+            string ReaderFound = "Reader: found";
             // List PC/SC card readers installed in the system
             retCode = ModWinsCard.SCardListReaders(hContext, null, null, ref pcchReaders);
             if (retCode != ModWinsCard.SCARD_S_SUCCESS)
@@ -86,8 +84,11 @@ namespace NFC_Keyfob_Tester
             {
                 RdrFound = true;
             }
-            this.Dispatcher.Invoke(() => { RdrF.Text = ""; });
-            this.Dispatcher.Invoke(() => { RdrF.Inlines.Add(ReaderFound); });
+            this.Dispatcher.Invoke(() => 
+            {
+                RdrF.Text = "";
+                RdrF.Inlines.Add(ReaderFound);
+            });
             string rName = "";
             int indx = 0;
             // Turn the reader names into string
@@ -102,8 +103,11 @@ namespace NFC_Keyfob_Tester
                     }
                     //Add reader name to list
                     Readers.Add(rName);
-                    this.Dispatcher.Invoke(() => { UsingReader.Text = ""; });
-                    this.Dispatcher.Invoke(() => { UsingReader.Inlines.Add("Using " + rName); });
+                    this.Dispatcher.Invoke(() => 
+                    { 
+                        UsingReader.Text = "";
+                        UsingReader.Inlines.Add("Using " + rName); 
+                    });
                     rName = "";
                     indx++;
                 }
@@ -114,7 +118,8 @@ namespace NFC_Keyfob_Tester
             // connect to the card
             string Connect = "";
             string Status = "";
-            string UMemory = "";
+            string uMemory = "";
+            bool cardC = false;
             if (RdrFound != false)
             {
                 retCode = ModWinsCard.SCardConnect(hContext, Readers[0], ModWinsCard.SCARD_SHARE_SHARED,
@@ -143,15 +148,24 @@ namespace NFC_Keyfob_Tester
                     }
                     else
                     {
+                        cardC = true;
                         Status = "Card status: connected";
                     }
                 }
             }
-            this.Dispatcher.Invoke(() => { ICF.Text = ""; }); // These set the text for the app. It's important to always delete previous text before adding anything new.
-            this.Dispatcher.Invoke(() => { ICF.Inlines.Add(Connect); });
-            this.Dispatcher.Invoke(() => { CardStatus.Text = ""; });
-            this.Dispatcher.Invoke(() => { CardStatus.Inlines.Add(Status); });
-            if (connectionSuccess != false)
+            this.Dispatcher.Invoke(() => 
+            { 
+                ICF.Text = ""; // These set the text for the app. It's important to always delete previous text before adding anything new.
+                ICF.Inlines.Add(Connect);
+                CardStatus.Text = "";
+                CardStatus.Inlines.Add(Status); 
+            });
+
+            type = "";
+            readLock = true;
+            writeLock = true;
+            bool memoryEmpty = true;
+            if (connectionSuccess != false && cardC != false)
             {
                 // This should get the uid of the tag.
                 ModWinsCard.SCARD_IO_REQUEST pioSendRequest = new ModWinsCard.SCARD_IO_REQUEST();
@@ -181,8 +195,6 @@ namespace NFC_Keyfob_Tester
 
                 if (retCode != ModWinsCard.SCARD_S_SUCCESS)
                 {
-                    error = ModWinsCard.GetScardErrMsg(retCode);
-                    type = error;
                 }
                 else
                 {
@@ -192,13 +204,13 @@ namespace NFC_Keyfob_Tester
                         if ((int)RecvBuff[2] != 18) { }
                         else { type = Generation(); TypeFound = true; }
                         if ((int)RecvBuff[2] != 62) { }
-                        else{ type = "NTAG 215"; TypeFound = true; }
+                        else { type = "NTAG 215"; TypeFound = true; }
                         if ((int)RecvBuff[2] != 109) { }
                         else { type = "NTAG 216"; TypeFound = true; }
                     }
                     else type = "NTAG unclear";
                 }
-                if (TypeFound != true && (int)RecvBuff[0] != 99)
+                if (TypeFound == false && RecvBuff[0] != 99)
                 {
                     Array.Clear(SendBuff, 0, SendBuff.Length);
                     Array.Clear(RecvBuff, 0, RecvBuff.Length);
@@ -207,8 +219,6 @@ namespace NFC_Keyfob_Tester
                     retCode = ModWinsCard.SCardTransmit(hCard, ref pioSendRequest, ref SendBuff[0], SendBuff.Length, ref pioSendRequest, ref RecvBuff[0], ref RecvLen);
                     if (retCode != ModWinsCard.SCARD_S_SUCCESS)
                     {
-                        error = ModWinsCard.GetScardErrMsg(retCode);
-                        type = error;
                     }
                     else
                     {
@@ -226,79 +236,159 @@ namespace NFC_Keyfob_Tester
                         else { type = "JCOP30"; TypeFound = true; }
                         if ((int)RecvBuff[6] != 98) { }
                         else { type = "Gemplus MPCOS"; TypeFound = true; }
-                        string tmpStr = "";
-                        int iBlock = 0;
-                        // Reads and displays the first 40 blocks of the card.
-                        for (int i = 0; i < 40; i++)
-                        {
-                            Array.Clear(SendBuff, 0, SendBuff.Length);
-                            Array.Clear(RecvBuff, 0, RecvBuff.Length);
-                            SendBuff = new byte[] { 0xFF, 0xB0, 0x00, (byte)iBlock, 0x04 };
-                            RecvLen = RecvBuff.Length;
-                            pioSendRequest.dwProtocol = ModWinsCard.SCARD_PROTOCOL_T1;
-                            pioSendRequest.cbPciLength = System.Runtime.InteropServices.Marshal.SizeOf(typeof(ModWinsCard.SCARD_IO_REQUEST));
-                            retCode = ModWinsCard.SCardTransmit(hCard, ref pioSendRequest, ref SendBuff[0], SendBuff.Length, ref pioSendRequest, ref RecvBuff[0], ref RecvLen);
-                            if (retCode != ModWinsCard.SCARD_S_SUCCESS)
-                            {
-                                error = ModWinsCard.GetScardErrMsg(retCode);
-                                UMemory = error;
-                                i = int.MaxValue;
-                            }
-                            else
-                            {
-                                tmpStr = "";
-                                for (indx = 0; indx <= RecvLen - 1; indx++)
-                                {
-                                    tmpStr += " " + string.Format("{0:X2}", RecvBuff[indx]);
-                                }
-                            }
-                            if (tmpStr.Contains("90 00"))
-                            {
-                                string n = "[" + string.Format("{0:00}", iBlock) + "] - "; // this is just formatting to make the blocks easy to read
-                                tmpStr = tmpStr.Replace("90 00", "");
-                                UMemory += n + tmpStr + "\n"; // adds them all together for a nice list
-                                if (ReadIsLocked != false) { ReadIsLocked = false; }
-                                if (n != "[06] - ") { }
-                                else
-                                {
-                                    WriteIsLocked = true;
-                                    byte[] testBuff = new byte[] { RecvBuff[0], RecvBuff[1], RecvBuff[2], RecvBuff[3] };
-                                    LockTest(testBuff);
-                                } // saves the first byte from block 06 so we can use it to test writing later.
-
-                            }
-                            else
-                            {
-                                UMemory += ("\n");
-                            }
-                            iBlock++;
-                        }
-                        this.Dispatcher.Invoke(() => { Lock.Text = ""; });
-                        if (ReadIsLocked != true)
-                        {
-                            this.Dispatcher.Invoke(() => { Lock.Inlines.Add("Read not locked. "); });
-                        }
-                        else { this.Dispatcher.Invoke(() => { Lock.Inlines.Add("Reading was unsuccesful. "); }); }
-                        if (WriteIsLocked != true)
-                        {
-                            this.Dispatcher.Invoke(() => { Lock.Inlines.Add("Writing not locked. "); });
-                        }
-                        else { this.Dispatcher.Invoke(() => { Lock.Inlines.Add("Writing was unsuccesful. "); }); }
                     }
-                    this.Dispatcher.Invoke(() => { userMemory.Text = ""; });
-                    this.Dispatcher.Invoke(() => { userMemory.Inlines.Add(UMemory); });
-                    this.Dispatcher.Invoke(() => { cmdTB.Text = ""; });
-                    this.Dispatcher.Invoke(() => { cmdTB.Inlines.Add(Cmd); });
+                }
+                string tmpStr = "";
+                int iBlock = 0;
+                for (int i = 0; i < 40; i++)
+                {
+                    int tmpInt = 0;
+                    // Reads and displays the first 40 blocks of the card.
+                    Array.Clear(SendBuff, 0, SendBuff.Length);
+                    Array.Clear(RecvBuff, 0, RecvBuff.Length);
+                    SendBuff = new byte[] { 0xFF, 0xB0, 0x00, (byte)iBlock, 0x04 };
+                    RecvLen = RecvBuff.Length;
+                    pioSendRequest.dwProtocol = ModWinsCard.SCARD_PROTOCOL_T1;
+                    pioSendRequest.cbPciLength = System.Runtime.InteropServices.Marshal.SizeOf(typeof(ModWinsCard.SCARD_IO_REQUEST));
+                    retCode = ModWinsCard.SCardTransmit(hCard, ref pioSendRequest, ref SendBuff[0], SendBuff.Length, ref pioSendRequest, ref RecvBuff[0], ref RecvLen);
+                    if (retCode != ModWinsCard.SCARD_S_SUCCESS)
+                    {
+                        error = ModWinsCard.GetScardErrMsg(retCode);
+                        uMemory = error;
+                        i = int.MaxValue;
+                    }
+                    else
+                    {
+                        tmpStr = "";
+                        for (indx = 0; indx <= RecvLen - 1; indx++)
+                        {
+                            tmpStr += " " + string.Format("{0:X2}", RecvBuff[indx]);
+                        }
+                    }
+                    if (tmpStr.Contains("90 00"))
+                    {
+                        string ascii = "";
+                        string n = "[" + string.Format("{0:00}", iBlock) + "] - "; // this is just formatting to make the blocks easy to read
+                        tmpStr = tmpStr.Replace("90 00", "");
+                        if (iBlock >= 4)
+                        {
+                            for (int index = 0; index <= 6; index += 2)
+                            {
+                                string tmp = tmpStr.Replace(" ", "");
+                                string hs = tmp.Substring(index, 2);
+                                uint dec = System.Convert.ToUInt32(hs.Trim(), 16);
+                                char character = System.Convert.ToChar(dec);
+                                ascii += character;
+                            }
+                        }
+                        uMemory += n + tmpStr + " - " + ascii + "\n"; // adds them all together for a nice list
 
-                    this.Dispatcher.Invoke(() => { NTAG.Text = ""; });
-                    this.Dispatcher.Invoke(() => { NTAG.Inlines.Add(type); });
+                        if (readLock != false) { readLock = false; }
+                        if (iBlock != 6) { }
+                        else
+                        {
+                            writeLock = true;
+                            byte[] testBuff = new byte[] { RecvBuff[0], RecvBuff[1], RecvBuff[2], RecvBuff[3] };
+                            LockTest(testBuff);
+                        } // saves the first byte from block 06 so we can use it to test writing later.
+                        if (memoryEmpty == false || iBlock < 4 || iBlock > 16)
+                        {
+                        }
+                        else
+                        {
+                            tmpInt += RecvBuff[0];
+                            tmpInt += RecvBuff[1];
+                            tmpInt += RecvBuff[2];
+                            tmpInt += RecvBuff[3];
+                            if (tmpInt > 0 && tmpInt != 144) { memoryEmpty = false; }
+                        }
+
+                    }
+                    else
+                    {
+                        uMemory += ("\n");
+                    }
+                    iBlock++;
                 }
             }
+            this.Dispatcher.Invoke(() =>
+            {
+                userMemory.Text = "";
+                userMemory.Inlines.Add(uMemory);
+                cmdTB.Text = "";
+                cmdTB.Inlines.Add(Cmd);
+                Change.Text = "";
+                if (Cmd != oldId) // if the id has changed or not 
+                {
+                    Change.Inlines.Add("Tag id changed!");
+                    SolidColorBrush brush = new SolidColorBrush();
+                    brush.Color = Color.FromArgb(255, 0, 255, 0);
+                    Change.Background = brush;
+                }
+                else { Change.Background = null; }
+                oldId = Cmd;
+                NTAG.Text = "";
+                NTAG.Inlines.Add(type);
+            });
+
+
+            this.Dispatcher.Invoke(() =>
+            {
+                Lock.Text = "";
+                if (readLock == false)
+                {
+                    Lock.Inlines.Add("Read not locked. ");
+                }
+                else { Lock.Inlines.Add("Reading was unsuccesful. "); }
+                ReadWrite.Fill = null;
+                if (writeLock == false)
+                {
+                    Lock.Inlines.Add("Writing not locked. ");
+                    SolidColorBrush brush = new SolidColorBrush();
+                    brush.Color = Color.FromArgb(255, 0, 255, 0);
+                    ReadWrite.Fill = brush;
+                }
+                else
+                {
+                    Lock.Inlines.Add("Writing was unsuccesful. ");
+                    SolidColorBrush brush = new SolidColorBrush();
+                    brush.Color = Color.FromArgb(255, 255, 0, 0);
+                    ReadWrite.Fill = brush;
+                }
+
+                eMemory.Fill = null;
+                if (memoryEmpty == true)
+                {
+                    SolidColorBrush brush = new SolidColorBrush();
+                    brush.Color = Color.FromArgb(255, 0, 255, 0);
+                    eMemory.Fill = brush;
+                }
+                else
+                {
+                    SolidColorBrush brush = new SolidColorBrush();
+                    brush.Color = Color.FromArgb(255, 255, 0, 0);
+                    eMemory.Fill = brush;
+                }
+
+                TagT.Fill = null;
+                if (type != "NTAG unclear" && !string.IsNullOrEmpty(type))
+                {
+                    SolidColorBrush brush = new SolidColorBrush();
+                    brush.Color = Color.FromArgb(255, 0, 255, 0);
+                    TagT.Fill = brush;
+                }
+                else
+                {
+                    SolidColorBrush brush = new SolidColorBrush();
+                    brush.Color = Color.FromArgb(255, 255, 0, 0);
+                    TagT.Fill = brush;
+                }
+            });
         }
 
         private void LockTest(byte[] tstByte)
         {
-
+            byte[] rstrByte = new byte[] { tstByte[0], tstByte[1], tstByte[2], tstByte[3] };
             // This will write over a block and checks if it changes. After that it returns it to its original value.
             for (int i = 0; i < tstByte.Length; i++)
             {
@@ -336,29 +426,25 @@ namespace NFC_Keyfob_Tester
                 }
                 else
                 {
-                    for (int i = 0; i < tstByte.Length; i++) // returns the tstStr to its original value (hopefully)
-                    {
-                        if (tstByte[i] != 0) { tstByte[i]--; }
-                        else { tstByte[i] = 255; }
-                    }
                     if (RecvBuff[0] != tstByte[0] && RecvBuff[0] != 99) // if writing was succesful
                     {
-                        WriteIsLocked = false;
-                        iBlock = 6;
-                        sBlock = iBlock.ToString();
-                        Array.Clear(SendBuff, 0, SendBuff.Length);
-                        Array.Clear(RecvBuff, 0, RecvBuff.Length);
-                        SendBuff = new byte[] { 0xff, 0xD6, 0x00, (byte)int.Parse(sBlock), 0x04, tstByte[0], tstByte[1], tstByte[2], tstByte[3] };
-                        pioSendRequest.dwProtocol = ModWinsCard.SCARD_PROTOCOL_T1;
-                        pioSendRequest.cbPciLength = System.Runtime.InteropServices.Marshal.SizeOf(typeof(ModWinsCard.SCARD_IO_REQUEST));
-                        SendLen = SendBuff[4] + 5;
-                        RecvLen = 0x02;
-                        retCode = ModWinsCard.SCardTransmit(hCard, ref pioSendRequest, ref SendBuff[0], SendLen, ref pioSendRequest, ref RecvBuff[0], ref RecvLen);
-                        if (retCode != ModWinsCard.SCARD_S_SUCCESS)
-                        {
-                            error = ModWinsCard.GetScardErrMsg(retCode);
-                            MessageBox.Show($"Error {error}");
-                        }
+                        writeLock = false;
+                    }
+                    iBlock = 6;
+                    sBlock = iBlock.ToString();
+                    Array.Clear(SendBuff, 0, SendBuff.Length);
+                    Array.Clear(RecvBuff, 0, RecvBuff.Length);
+                    SendBuff = new byte[] { 0xff, 0xD6, 0x00, (byte)int.Parse(sBlock), 0x04, rstrByte[0], rstrByte[1], rstrByte[2], rstrByte[3] };
+                    pioSendRequest.dwProtocol = ModWinsCard.SCARD_PROTOCOL_T1;
+                    pioSendRequest.cbPciLength = System.Runtime.InteropServices.Marshal.SizeOf(typeof(ModWinsCard.SCARD_IO_REQUEST));
+                    SendLen = SendBuff[4] + 5;
+                    RecvLen = 0x02;
+                    retCode = ModWinsCard.SCardTransmit(hCard, ref pioSendRequest, ref SendBuff[0], SendLen, ref pioSendRequest, ref RecvBuff[0], ref RecvLen); // returns the block to its original value.
+                    if (retCode != ModWinsCard.SCARD_S_SUCCESS)
+                    {
+                        error = ModWinsCard.GetScardErrMsg(retCode);
+                        MessageBox.Show($"Error {error}");
+
                     }
                 }
             }
@@ -373,20 +459,20 @@ namespace NFC_Keyfob_Tester
                 // there is a risk that this could lock the card, but if you try to delete memory from an unknown card that's kind of on you.
                 if (type != "NTAG 213") { } // I do it this way because != is faster than ==
                 else { iLength = 36; }
-                if (type != "NTAG 203") { } 
+                if (type != "NTAG 203") { }
                 else { iLength = 36; }
                 if (type != "Mifare Ultralight") { }
                 else { iLength = 12; }
                 if (type != "NTAG 215") { }
                 else { iLength = 126; }
+                if (type != "NTAG 216") { }
+                else { iLength = 222; }
                 if (type != "Mifare 1K") { }
-                else { iLength = 256; }
+                else { iLength = 250; }
                 if (type != "Mifare 4K") { }
                 else { iLength = 1012; }
                 if (type != "Mifare MINI") { }
                 else { iLength = 80; }
-                if (type != "Mifare 1K") { }
-                else { iLength = 256; }
                 if (type != "Mifare 4K") { }
                 else { iLength = 1012; }
                 for (int i = 0; i < iLength; i++)
@@ -409,6 +495,7 @@ namespace NFC_Keyfob_Tester
                     iBlock++;
                 }
             }
+            Thread.Sleep(250);
             StartApp(); // refreshes the information after deletion
         }
         private string Generation()
@@ -453,37 +540,37 @@ namespace NFC_Keyfob_Tester
                 this.Dispatcher.Invoke(() => { InputText = Input.Text; });
                 byte[] Cnvrtd = Encoding.Default.GetBytes(InputText);
                 int length = Cnvrtd.Length % 4;
-                if (length != 0) 
+                if (length != 0)
                 {
                     byte[] tmp = new byte[Cnvrtd.Length + 4 - length];
                     Cnvrtd.CopyTo(tmp, 0);
-                    for (int i = 0; i < 4 - length; i++) 
+                    for (int i = 0; i < 4 - length; i++)
                     {
                         tmp[Cnvrtd.Length + i] = 00;
                     }
                     Cnvrtd = tmp;
-                   // in short this loop just adds zeros to the end of the byte[] if its not divisible by 4 (the amount of writable bytes per block in most cards)
+                    // in short this loop just adds zeros to the end of the byte[] if its not divisible by 4 (the amount of writable bytes per block in most cards)
                 }
                 int iBlock = 4;
                 int iLength = 222;
                 // this is the amount of writable blocks in NTAG 216. It was chosen as default because it doesn't take too long to process, but still clears the memory (most of the time) if the type is unclear.
                 // there is a risk that this could lock the card, but if you try to delete memory from an unknown card that's kind of on you.
-                if (type != "NTAG 213") { } // I do it this way because iirc != is faster than ==
+                if (type != "NTAG 213") { }
                 else { iLength = 36; }
                 if (type != "NTAG 203") { }
                 else { iLength = 36; }
-                if (type != "Mifare Ultralight") { }
-                else { iLength = 12; }
+                if (type == "Mifare Ultralight") { iLength = 12; }
+                else { }
                 if (type != "NTAG 215") { }
                 else { iLength = 126; }
+                if (type != "NTAG 216") { }
+                else { iLength = 222; }
                 if (type != "Mifare 1K") { }
-                else { iLength = 256; }
+                else { iLength = 250; }
                 if (type != "Mifare 4K") { }
                 else { iLength = 1012; }
                 if (type != "Mifare MINI") { }
                 else { iLength = 80; }
-                if (type != "Mifare 1K") { }
-                else { iLength = 256; }
                 if (type != "Mifare 4K") { }
                 else { iLength = 1012; }
                 if (iLength < Cnvrtd.Length / 4)
@@ -523,16 +610,18 @@ namespace NFC_Keyfob_Tester
             rTimer.Elapsed += OnTimedEvent;
             rTimer.AutoReset = true;
             rTimer.Enabled = true;
+
         }
         private void Timer_Unchecked(object sender, RoutedEventArgs e)
         {
             // Disables timer
             rTimer.Enabled = false;
         }
-        private void OnTimedEvent(object source, ElapsedEventArgs e)
+        private void OnTimedEvent(Object source, ElapsedEventArgs e)
         {
             StartApp();
         }
+
         private void Refresh_Click(object sender, RoutedEventArgs e)
         {
             StartApp();

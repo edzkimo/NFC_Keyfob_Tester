@@ -9,47 +9,75 @@
         FontSize="20">
 
     <Grid>
-        <TextBlock Name="LblContext" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="25,25,0,0" Height="50" Width="700"/>
 
-        <TextBlock Name="RdrF" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,75,0,0" Height="50" Width="700"/>
+        <TextBlock Name="RdrF" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,25,0,0" Height="50" Width="700"/>
 
-        <TextBlock Name="UsingReader" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,125,0,0" Height="50" Width="700"/>
+        <TextBlock Name="UsingReader" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,75,0,0" Height="50" Width="700"/>
 
-        <TextBlock Name="ICF" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,175,0,0" Height="50" Width="700"/>
+        <TextBlock Name="ICF" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,125,0,0" Height="50" Width="700"/>
 
-        <TextBlock Name="CardStatus" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,225,0,0" Height="50" Width="700"/>
+        <TextBlock Name="CardStatus" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,175,0,0" Height="50" Width="700"/>
 
-        <TextBlock Name="Card" TextDecorations="Underline" Text="Card information:" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,275,0,0" Height="50" Width="700"/>
+        <TextBlock Name="Card" TextDecorations="Underline" Text="Card information:" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,225,0,0" Height="50" Width="700"/>
 
         <Button Name ="Delete" VerticalAlignment="Top" HorizontalAlignment="Right" Margin=" 50, 30" Height="50" Width="150" Click="Delete_Click">Delete memory</Button>
-        
+
         <TextBlock TextDecorations="Underline" Text="Use with caution!" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="50, 80" Height="25" Width="150"/>
-        
+
         <Button Name ="Refresh" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="50, 130" Height="50" Width="150" Click="Refresh_Click">Refresh</Button>
 
         <CheckBox Name ="Timer" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="20, 190" Height="25" Width="175" FontSize="13" Checked="Timer_Checked" Unchecked="Timer_Unchecked">Set to refresh automatically.</CheckBox>
 
-        <TextBlock Text="Memory content: " VerticalAlignment="Top" HorizontalAlignment="Right" Margin="250,225" Height="50" Width="150"/>        
+        <TextBlock Text="Memory content: " VerticalAlignment="Top" HorizontalAlignment="Right" Margin="250,225" Height="50" Width="150"/>
 
-        <TextBlock Name="cmdTB" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,325,0,0" Height="40" Width="700" />
-        
-        <TextBlock Name="NTAG" VerticalAlignment="Top" HorizontalAlignment="Left" FontSize="28" TextDecorations="Underline" Margin="50,375,0,0" Height="50" Width="700"/>
+        <TextBlock Name="cmdTB" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,275,0,0" Height="40" Width="700" />
 
-        <TextBlock Name="Lock" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,425,0,0" Height="40" Width="700"/>
+        <TextBlock Name="NTAG" VerticalAlignment="Top" HorizontalAlignment="Left" FontSize="28" TextDecorations="Underline" Margin="50,325,0,0" Height="50" Width="700"/>
+
+        <TextBlock Name="Lock" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,375,0,0" Height="40" Width="700"/>
+
+        <TextBlock Name="Change" VerticalAlignment="Top" HorizontalAlignment="Left" FontSize="24" Margin="50, 425, 0, 0" Height="40" Width="300"/>
 
         <TextBlock Text="User memory starts at block [4] ->" FontSize="12" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="205,307.5" Height="30" Width="195"/>
-        
-        <TextBlock Name="userMemory" FontSize="15" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0, 225, 25, 0" Height="550" Width="175"/>
-        
+
+        <TextBlock Name="userMemory" FontSize="14" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0, 225, 25, 0" Height="900" Width="175"/>
+
         <TextBox Name="Input" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,475,0,0" Height="50" Width="300" />
-        
+
         <Button Name="Write" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="375,475,0,0" Height="50" Width="150" Click="Write_Click">Write on tag</Button>
         
+        <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Left" Height="50" Width="75" Margin="50,75" FontSize="10">Memory empty?</TextBlock>
+        <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Left" Height="50" Width="75" Margin="150,75" FontSize="10">Tag type ok?</TextBlock>
+        <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Left" Height="50" Width="75" Margin="250,75" FontSize="10">Unlocked?</TextBlock>
+
         <Image  VerticalAlignment="Bottom" HorizontalAlignment="Left" Height="50" Width="250">
             <Image.Source>
                 <BitmapImage DecodePixelWidth="250" DecodePixelHeight="50" UriSource="/images/aksulit_logo_cmyk.jpg" />
             </Image.Source>
         </Image>
+        <Canvas VerticalAlignment="Bottom" HorizontalAlignment="Left" Height="75" Width="250" Margin="50,100">
+            <Ellipse
+                Name="eMemory"
+                Width="40"
+                Height="40"
+                Stroke="Black"
+                StrokeThickness="3"
+                Canvas.Left="0"/>
+            <Ellipse
+                Name="TagT"
+                Width="40"
+                Height="40"
+                Stroke="Black"
+                StrokeThickness="3"
+                Canvas.Left="100"/>
+            <Ellipse
+                Name="ReadWrite"
+                Width="40"
+                Height="40"
+                Stroke="Black"
+                StrokeThickness="3"
+                Canvas.Left="200"/>
+        </Canvas>
     </Grid>
 </Window>
    
