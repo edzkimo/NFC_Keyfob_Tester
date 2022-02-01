@@ -34,7 +34,7 @@ namespace NFC_Keyfob_Tester
         public ModWinsCard.SCARD_READERSTATE RdrState;
         public ModWinsCard.SCARD_IO_REQUEST pioSendRequest;
         public int pcchReaders = 0;
-        public bool connectionSuccess = false, RdrFound = false, readLock = true, writeLock = true, timerCheck;
+        public bool connectionSuccess = false, RdrFound = false, readLock = true, writeLock = true, aDelete = false, dRefresh = false, timerCheck;
         public string error = "", Cmd = "", msg = "", type = "", oldId = "";
         public List<string> Readers = new List<string>();
         public AutoResetEvent ResetApp = new AutoResetEvent(false);
@@ -56,7 +56,7 @@ namespace NFC_Keyfob_Tester
             else
             {
             }
-
+            Console.Beep(100, 300);
             string ReaderFound = "Reader: found";
             // List PC/SC card readers installed in the system
             retCode = ModWinsCard.SCardListReaders(hContext, null, null, ref pcchReaders);
@@ -240,10 +240,27 @@ namespace NFC_Keyfob_Tester
                 }
                 string tmpStr = "";
                 int iBlock = 0;
-                for (int i = 0; i < 40; i++)
+                int iLength = 20;
+                if (type != "NTAG 213") { }
+                else { iLength = 45; }
+                if (type != "NTAG 203") { }
+                else { iLength = 45; }
+                if (type != "Mifare Ultralight") { }
+                else { iLength = 20; }
+                if (type != "NTAG 215") { }
+                else { iLength = 135; }
+                if (type != "NTAG 216") { }
+                else { iLength = 231; }
+                if (type != "Mifare 1K") { }
+                else { iLength = 256; }
+                if (type != "Mifare 4K") { }
+                else { iLength = 1024; }
+                if (type != "Mifare MINI") { }
+                else { iLength = 80; }
+                for (int i = 0; i < iLength; i++)
                 {
                     int tmpInt = 0;
-                    // Reads and displays the first 40 blocks of the card.
+                    // Reads and displays all the blocks of the card.
                     Array.Clear(SendBuff, 0, SendBuff.Length);
                     Array.Clear(RecvBuff, 0, RecvBuff.Length);
                     SendBuff = new byte[] { 0xFF, 0xB0, 0x00, (byte)iBlock, 0x04 };
@@ -291,19 +308,28 @@ namespace NFC_Keyfob_Tester
                             byte[] testBuff = new byte[] { RecvBuff[0], RecvBuff[1], RecvBuff[2], RecvBuff[3] };
                             LockTest(testBuff);
                         } // saves the first byte from block 06 so we can use it to test writing later.
-                        if (memoryEmpty == false || iBlock < 4 || iBlock > 16)
+
+                        if (type != "Mifare Ultralight" || iBlock < 16)
                         {
                         }
                         else
+                        { 
+                            type = "Mifare Ultralight EV1"; 
+                            break;
+                        }
+
+                        if (memoryEmpty == true && iBlock > 4 && iBlock < iLength - 6) // tests if the blocks are empty
                         {
                             tmpInt += RecvBuff[0];
                             tmpInt += RecvBuff[1];
                             tmpInt += RecvBuff[2];
                             tmpInt += RecvBuff[3];
-                            if (tmpInt > 0 && tmpInt != 144) { memoryEmpty = false; }
+                            if (tmpInt <= 0 || tmpInt == 144) { }
+                            else { memoryEmpty = false; }
                         }
 
                     }
+
                     else
                     {
                         uMemory += ("\n");
@@ -371,7 +397,7 @@ namespace NFC_Keyfob_Tester
                 }
 
                 TagT.Fill = null;
-                if (type != "NTAG unclear" && !string.IsNullOrEmpty(type))
+                if (type != "NTAG unclear" && type != "NTAG 203" && !string.IsNullOrEmpty(type))
                 {
                     SolidColorBrush brush = new SolidColorBrush();
                     brush.Color = Color.FromArgb(255, 0, 255, 0);
@@ -384,6 +410,9 @@ namespace NFC_Keyfob_Tester
                     TagT.Fill = brush;
                 }
             });
+            if (aDelete && !dRefresh) { Delete_Click(null, null); } // if autodelete is on calls Delete_Click once.
+
+            dRefresh = false;
         }
 
         private void LockTest(byte[] tstByte)
@@ -457,24 +486,24 @@ namespace NFC_Keyfob_Tester
                 int iLength = 222;
                 // this is the amount of writable blocks in NTAG 216. It was chosen as default because it doesn't take too long to process, but still clears the memory (most of the time) if the type is unclear.
                 // there is a risk that this could lock the card, but if you try to delete memory from an unknown card that's kind of on you.
-                if (type != "NTAG 213") { } // I do it this way because != is faster than ==
+                if (type != "NTAG 213") { }
                 else { iLength = 36; }
                 if (type != "NTAG 203") { }
                 else { iLength = 36; }
                 if (type != "Mifare Ultralight") { }
+                else { iLength = 12; }
+                if (type != "Mifare Ultralight EV1") { }
                 else { iLength = 12; }
                 if (type != "NTAG 215") { }
                 else { iLength = 126; }
                 if (type != "NTAG 216") { }
                 else { iLength = 222; }
                 if (type != "Mifare 1K") { }
-                else { iLength = 250; }
+                else { iLength = 179; }
                 if (type != "Mifare 4K") { }
-                else { iLength = 1012; }
+                else { iLength = 816; }
                 if (type != "Mifare MINI") { }
-                else { iLength = 80; }
-                if (type != "Mifare 4K") { }
-                else { iLength = 1012; }
+                else { iLength = 56; }
                 for (int i = 0; i < iLength; i++)
                 {
                     string sBlock = iBlock.ToString();
@@ -495,8 +524,8 @@ namespace NFC_Keyfob_Tester
                     iBlock++;
                 }
             }
-            Thread.Sleep(250);
-            StartApp(); // refreshes the information after deletion
+            dRefresh = true;
+            if (rTimer.Enabled == false) { StartApp(); } // refreshes the information after deletion
         }
         private string Generation()
         {
@@ -532,7 +561,7 @@ namespace NFC_Keyfob_Tester
                 return "NTAG 203";
             }
         }
-        private void Write_Click(object sender, RoutedEventArgs e) // TODO: make this work
+        private void Write_Click(object sender, RoutedEventArgs e)
         {
             if (connectionSuccess != false)
             {
@@ -559,20 +588,21 @@ namespace NFC_Keyfob_Tester
                 else { iLength = 36; }
                 if (type != "NTAG 203") { }
                 else { iLength = 36; }
-                if (type == "Mifare Ultralight") { iLength = 12; }
-                else { }
+                if (type != "Mifare Ultralight") { }
+                else { iLength = 12; }
+                if (type != "Mifare Ultralight EV1") { }
+                else { iLength = 12; }
                 if (type != "NTAG 215") { }
                 else { iLength = 126; }
                 if (type != "NTAG 216") { }
                 else { iLength = 222; }
                 if (type != "Mifare 1K") { }
-                else { iLength = 250; }
+                else { iLength = 179; }
                 if (type != "Mifare 4K") { }
-                else { iLength = 1012; }
+                else { iLength = 816; }
                 if (type != "Mifare MINI") { }
-                else { iLength = 80; }
-                if (type != "Mifare 4K") { }
-                else { iLength = 1012; }
+                else { iLength = 56; }
+
                 if (iLength < Cnvrtd.Length / 4)
                 {
                     MessageBox.Show("Card size is too small to write that input");
@@ -603,10 +633,15 @@ namespace NFC_Keyfob_Tester
             StartApp(); // refreshes the information after
         }
 
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter || e.Key == Key.Space) { StartApp(); }
+        }
+
         private void Timer_Checked(object sender, RoutedEventArgs e)
         {
             // Creates and runs a timer to refresh the app.
-            rTimer = new System.Timers.Timer(2500);
+            rTimer = new System.Timers.Timer(3000);
             rTimer.Elapsed += OnTimedEvent;
             rTimer.AutoReset = true;
             rTimer.Enabled = true;
@@ -626,5 +661,15 @@ namespace NFC_Keyfob_Tester
         {
             StartApp();
         }
+        private void autoDelete_Checked(object sender, RoutedEventArgs e)
+        {
+            aDelete = true;
+        }
+
+        private void autoDelete_Unchecked(object sender, RoutedEventArgs e)
+        {
+            aDelete = false;
+        }
+
     }
 }

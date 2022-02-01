@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NFC_Keyfob_Tester"
         mc:Ignorable="d"
-        Title="NFC Keyfob Tester" Height="800" Width="1200"
+        Title="NFC Keyfob Tester" Height="800" Width="1200" KeyDown="Window_KeyDown"
         FontSize="20">
 
     <Grid>
@@ -22,11 +22,13 @@
 
         <Button Name ="Delete" VerticalAlignment="Top" HorizontalAlignment="Right" Margin=" 50, 30" Height="50" Width="150" Click="Delete_Click">Delete memory</Button>
 
-        <TextBlock TextDecorations="Underline" Text="Use with caution!" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="50, 80" Height="25" Width="150"/>
+        <CheckBox Name ="autoDelete" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="25, 85" Height="25" Width="175" FontSize="13" Checked="autoDelete_Checked" Unchecked="autoDelete_Unchecked">Delete automatically.</CheckBox>
+
+        <TextBlock TextDecorations="Underline" Text="Use with caution!" FontSize="16" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="50, 100" Height="25" Width="150"/>
 
         <Button Name ="Refresh" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="50, 130" Height="50" Width="150" Click="Refresh_Click">Refresh</Button>
 
-        <CheckBox Name ="Timer" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="20, 190" Height="25" Width="175" FontSize="13" Checked="Timer_Checked" Unchecked="Timer_Unchecked">Set to refresh automatically.</CheckBox>
+        <CheckBox Name ="Timer" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="25, 190" Height="25" Width="175" FontSize="13" Checked="Timer_Checked" Unchecked="Timer_Unchecked">Set to refresh automatically.</CheckBox>
 
         <TextBlock Text="Memory content: " VerticalAlignment="Top" HorizontalAlignment="Right" Margin="250,225" Height="50" Width="150"/>
 
@@ -38,9 +40,13 @@
 
         <TextBlock Name="Change" VerticalAlignment="Top" HorizontalAlignment="Left" FontSize="24" Margin="50, 425, 0, 0" Height="40" Width="300"/>
 
-        <TextBlock Text="User memory starts at block [4] ->" FontSize="12" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="205,307.5" Height="30" Width="195"/>
-
-        <TextBlock Name="userMemory" FontSize="14" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0, 225, 25, 0" Height="900" Width="175"/>
+        <TextBlock Text="User memory starts at block [4] ->" FontSize="12" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="205,300" Height="30" Width="195"/>
+        
+        <ScrollViewer Height="550" HorizontalAlignment="Right" Margin="0,225,0,0">
+            
+            <TextBlock Name="userMemory" FontSize="14" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0" Height="1000" Width="200"/>
+            
+         </ScrollViewer>
 
         <TextBox Name="Input" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="50,475,0,0" Height="50" Width="300" />
 
